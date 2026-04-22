@@ -1,0 +1,2260 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="九十九里海岸のリアルタイム波情報。波・風・うねり・潮汐を自動更新。"
+    />
+    <title>KUJUKURI SURF — 九十九里 波情報</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@300;400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* =============================================
+   KUJUKURI SURF REPORT — ディープオーシャン × ネオンブルー
+   ============================================= */
+      :root {
+        --bg: #020d1a;
+        --bg2: #051a30;
+        --bg3: #0a2a4a;
+        --cyan: #00e5ff;
+        --teal: #00bcd4;
+        --green: #00e676;
+        --amber: #ffb300;
+        --red: #ff5252;
+        --text: #e8f4fc;
+        --muted: rgba(168, 223, 240, 0.65);
+        --card-bg: rgba(5, 26, 48, 0.72);
+        --card-b: rgba(0, 229, 255, 0.15);
+        --glow: 0 0 20px rgba(0, 229, 255, 0.45);
+        --r: 14px;
+        --r-sm: 8px;
+        --tr: 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        --font-d: "Bebas Neue", cursive;
+        --font-jp: "Noto Sans JP", sans-serif;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        font-family: var(--font-jp);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* ── 背景 ── */
+      .bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        background:
+          radial-gradient(ellipse at 20% 60%, #051a30 0%, #020d1a 65%),
+          radial-gradient(ellipse at 85% 15%, #0a2a4a 0%, transparent 55%);
+      }
+      .bg::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            ellipse 900px 450px at 15% 80%,
+            rgba(0, 229, 255, 0.04) 0%,
+            transparent 70%
+          ),
+          radial-gradient(
+            ellipse 700px 350px at 90% 25%,
+            rgba(0, 188, 212, 0.05) 0%,
+            transparent 70%
+          );
+        animation: bgPulse 9s ease-in-out infinite alternate;
+      }
+      @keyframes bgPulse {
+        from {
+          opacity: 0.5;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* ── ローダー ── */
+      .loader {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        transition: opacity 0.6s ease;
+      }
+      .loader.out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .loader-bars {
+        display: flex;
+        gap: 7px;
+        align-items: flex-end;
+        height: 44px;
+      }
+      .lb {
+        width: 5px;
+        border-radius: 3px;
+        background: var(--cyan);
+        box-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+        animation: lb 1.1s ease-in-out infinite;
+      }
+      .lb:nth-child(1) {
+        animation-delay: 0s;
+        height: 18px;
+      }
+      .lb:nth-child(2) {
+        animation-delay: 0.12s;
+        height: 28px;
+      }
+      .lb:nth-child(3) {
+        animation-delay: 0.24s;
+        height: 44px;
+      }
+      .lb:nth-child(4) {
+        animation-delay: 0.36s;
+        height: 32px;
+      }
+      .lb:nth-child(5) {
+        animation-delay: 0.48s;
+        height: 16px;
+      }
+      @keyframes lb {
+        0%,
+        100% {
+          transform: scaleY(0.35);
+          opacity: 0.5;
+        }
+        50% {
+          transform: scaleY(1);
+          opacity: 1;
+        }
+      }
+      .loader-txt {
+        font-family: var(--font-d);
+        font-size: 1.1rem;
+        letter-spacing: 0.22em;
+        color: var(--cyan);
+        text-shadow: var(--glow);
+        animation: txtPulse 1.6s ease-in-out infinite;
+      }
+      @keyframes txtPulse {
+        0%,
+        100% {
+          opacity: 0.55;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      /* ── レイアウト ── */
+      #wrap {
+        position: relative;
+        z-index: 1;
+        max-width: 1360px;
+        margin: 0 auto;
+        padding: 0 14px 80px;
+      }
+
+      /* ── ヘッダー ── */
+      .hdr {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(2, 13, 26, 0.88);
+        backdrop-filter: blur(22px);
+        -webkit-backdrop-filter: blur(22px);
+        border-bottom: 1px solid var(--card-b);
+        margin: 0 -14px;
+      }
+      .hdr-logo {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+      .hdr-en {
+        font-family: var(--font-d);
+        font-size: clamp(1.3rem, 4vw, 2rem);
+        letter-spacing: 0.1em;
+        color: var(--cyan);
+        text-shadow: var(--glow);
+        line-height: 1;
+      }
+      .hdr-jp {
+        font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+        color: var(--muted);
+        letter-spacing: 0.18em;
+      }
+      .hdr-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 5px;
+      }
+      .upd-time {
+        font-size: 0.68rem;
+        color: var(--muted);
+        letter-spacing: 0.05em;
+      }
+      .upd-time span {
+        color: var(--cyan);
+        font-weight: 700;
+      }
+      .refbtn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(0, 229, 255, 0.1);
+        border: 1px solid rgba(0, 229, 255, 0.3);
+        color: var(--cyan);
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-family: var(--font-jp);
+        cursor: pointer;
+        transition: var(--tr);
+        letter-spacing: 0.05em;
+      }
+      .refbtn:hover {
+        background: rgba(0, 229, 255, 0.2);
+        box-shadow: var(--glow);
+      }
+      .refbtn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .spin {
+        display: inline-block;
+        transition: transform 0.5s;
+      }
+      .refbtn.loading .spin {
+        animation: spin 0.7s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ── Canvas セクション ── */
+      .wave-sec {
+        margin-top: 18px;
+        border-radius: var(--r);
+        overflow: hidden;
+        position: relative;
+        border: 1px solid var(--card-b);
+        background: var(--bg2);
+      }
+      #waveCanvas {
+        display: block;
+        width: 100%;
+        height: clamp(170px, 28vw, 290px);
+      }
+      .cv-top {
+        position: absolute;
+        top: 14px;
+        left: 18px;
+        z-index: 10;
+        pointer-events: none;
+      }
+      .cv-spot {
+        font-family: var(--font-d);
+        font-size: clamp(1rem, 3vw, 1.5rem);
+        letter-spacing: 0.12em;
+        color: rgba(255, 255, 255, 0.92);
+        text-shadow: 0 2px 14px rgba(0, 0, 0, 0.85);
+        line-height: 1.1;
+      }
+      .live-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: rgba(255, 82, 82, 0.85);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        margin-top: 4px;
+      }
+      .live-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #fff;
+        animation: lbLink 1.3s ease-in-out infinite;
+      }
+      @keyframes lbLink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.15;
+        }
+      }
+      .cv-chips {
+        position: absolute;
+        bottom: 12px;
+        right: 12px;
+        display: flex;
+        gap: 6px;
+        z-index: 10;
+        pointer-events: none;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .chip {
+        background: rgba(2, 13, 26, 0.72);
+        border: 1px solid rgba(0, 229, 255, 0.2);
+        backdrop-filter: blur(8px);
+        padding: 4px 11px;
+        border-radius: 20px;
+        font-size: 0.68rem;
+        color: var(--text);
+      }
+      .chip strong {
+        color: var(--cyan);
+        font-size: 0.82rem;
+      }
+
+      /* ── スポットタブ ── */
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-top: 18px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 3px;
+      }
+      .tabs::-webkit-scrollbar {
+        display: none;
+      }
+      .tab {
+        flex-shrink: 0;
+        padding: 7px 16px;
+        border-radius: 22px;
+        font-size: 0.76rem;
+        font-family: var(--font-jp);
+        cursor: pointer;
+        border: 1px solid rgba(0, 229, 255, 0.2);
+        background: rgba(5, 26, 48, 0.5);
+        color: var(--muted);
+        transition: var(--tr);
+        white-space: nowrap;
+      }
+      .tab:hover {
+        border-color: rgba(0, 229, 255, 0.5);
+        color: var(--text);
+      }
+      .tab.on {
+        background: rgba(0, 229, 255, 0.12);
+        border-color: var(--cyan);
+        color: var(--cyan);
+        box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+      }
+
+      /* ── グリッド ── */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 13px;
+        margin-top: 18px;
+      }
+      @media (max-width: 880px) {
+        .grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (max-width: 560px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ── カード ── */
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-b);
+        border-radius: var(--r);
+        padding: 18px;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        transition: var(--tr);
+        position: relative;
+        overflow: hidden;
+        animation: fadeUp 0.5s ease both;
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: var(--r);
+        background: linear-gradient(
+          135deg,
+          rgba(0, 229, 255, 0.03) 0%,
+          transparent 60%
+        );
+        pointer-events: none;
+      }
+      .card:hover {
+        border-color: rgba(0, 229, 255, 0.35);
+        transform: translateY(-2px);
+        box-shadow:
+          0 8px 32px rgba(0, 0, 0, 0.4),
+          0 0 22px rgba(0, 229, 255, 0.06);
+      }
+      .span2 {
+        grid-column: span 2;
+      }
+      @media (max-width: 560px) {
+        .span2 {
+          grid-column: span 1;
+        }
+      }
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .c-hdr {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .c-ico {
+        font-size: 1rem;
+        filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.4));
+      }
+      .c-ttl {
+        font-size: 0.68rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      /* ── コンディションカード ── */
+      .cond-main {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: 14px;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .wave-size .lbl {
+        font-size: 0.62rem;
+        color: var(--muted);
+        letter-spacing: 0.1em;
+        margin-bottom: 2px;
+      }
+      .wave-size .val {
+        font-family: var(--font-d);
+        font-size: clamp(2.2rem, 5.5vw, 3.4rem);
+        line-height: 1;
+        color: var(--cyan);
+        text-shadow: var(--glow);
+        letter-spacing: 0.04em;
+      }
+      .wave-size .sub {
+        font-size: 0.68rem;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .quality {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+      .q-score {
+        font-family: var(--font-d);
+        font-size: 2.6rem;
+        line-height: 1;
+        letter-spacing: 0.04em;
+      }
+      .q-tag {
+        font-size: 0.62rem;
+        letter-spacing: 0.1em;
+        padding: 2px 9px;
+        border-radius: 12px;
+        font-weight: 700;
+      }
+      .good .q-score {
+        color: var(--green);
+      }
+      .good .q-tag {
+        background: rgba(0, 230, 118, 0.14);
+        color: var(--green);
+      }
+      .fair .q-score {
+        color: var(--amber);
+      }
+      .fair .q-tag {
+        background: rgba(255, 179, 0, 0.14);
+        color: var(--amber);
+      }
+      .poor .q-score {
+        color: var(--red);
+      }
+      .poor .q-tag {
+        background: rgba(255, 82, 82, 0.14);
+        color: var(--red);
+      }
+      .cond-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7px;
+      }
+      .ci {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: var(--r-sm);
+        padding: 9px 11px;
+      }
+      .ci .l {
+        font-size: 0.58rem;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .ci .v {
+        font-size: 0.88rem;
+        font-weight: 700;
+        margin-top: 2px;
+      }
+
+      /* ── 風カード ── */
+      .wind-row {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+      .compass {
+        width: 78px;
+        height: 78px;
+        flex-shrink: 0;
+        position: relative;
+      }
+      .c-ring {
+        width: 78px;
+        height: 78px;
+        border-radius: 50%;
+        border: 2px solid rgba(0, 229, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+      .c-ring::before {
+        content: "N";
+        position: absolute;
+        top: -1px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.58rem;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .c-arrow {
+        width: 3px;
+        height: 32px;
+        background: linear-gradient(
+          to bottom,
+          var(--cyan) 50%,
+          rgba(0, 229, 255, 0.2) 50%
+        );
+        border-radius: 2px;
+        transform-origin: center center;
+        transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .wind-info .spd {
+        font-family: var(--font-d);
+        font-size: 2.2rem;
+        line-height: 1;
+        color: var(--cyan);
+        letter-spacing: 0.04em;
+      }
+      .wind-info .unit {
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-left: 3px;
+      }
+      .wind-info .dir {
+        font-size: 0.75rem;
+        margin-top: 4px;
+      }
+      .wtype {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 0.63rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        margin-top: 5px;
+      }
+      .offshore {
+        background: rgba(0, 230, 118, 0.14);
+        color: var(--green);
+      }
+      .onshore {
+        background: rgba(255, 82, 82, 0.14);
+        color: var(--red);
+      }
+      .side-off {
+        background: rgba(255, 179, 0, 0.14);
+        color: var(--amber);
+      }
+      .sideshore {
+        background: rgba(255, 179, 0, 0.14);
+        color: var(--amber);
+      }
+      .gust {
+        font-size: 0.68rem;
+        color: var(--muted);
+        margin-top: 5px;
+      }
+
+      /* ── うねりカード ── */
+      .swell-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sw-item {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .sw-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .sw-name {
+        font-size: 0.68rem;
+        color: var(--muted);
+      }
+      .sw-val {
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+      .bar-track {
+        height: 5px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .fill-a {
+        background: linear-gradient(90deg, var(--teal), var(--cyan));
+      }
+      .fill-b {
+        background: linear-gradient(90deg, #1f7299, #2e9cc4);
+      }
+      .fill-c {
+        background: linear-gradient(90deg, #7c3aed, #a78bfa);
+      }
+      .swell-dirs {
+        display: flex;
+        gap: 7px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+      }
+
+      /* ── 潮汐カード ── */
+      #tideCanvas {
+        width: 100%;
+        height: 76px;
+        display: block;
+        border-radius: var(--r-sm);
+      }
+      .tide-events {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 10px;
+      }
+      .te {
+        flex: 1;
+        min-width: 72px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: var(--r-sm);
+        padding: 7px 9px;
+      }
+      .te-type {
+        font-size: 0.58rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+      }
+      .te-time {
+        font-family: var(--font-d);
+        font-size: 0.95rem;
+        color: var(--cyan);
+        letter-spacing: 0.06em;
+      }
+      .te-h {
+        font-size: 0.68rem;
+        color: var(--muted);
+      }
+
+      /* ── 予報カード ── */
+      .fc-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+        gap: 7px;
+      }
+      .fc-item {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: var(--r-sm);
+        padding: 9px 6px;
+        text-align: center;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: var(--tr);
+      }
+      .fc-item:hover,
+      .fc-item.on {
+        border-color: rgba(0, 229, 255, 0.3);
+        background: rgba(0, 229, 255, 0.07);
+      }
+      .fc-time {
+        font-size: 0.6rem;
+        color: var(--muted);
+      }
+      .fc-ico {
+        font-size: 1.25rem;
+        margin: 3px 0;
+        display: block;
+      }
+      .fc-wave {
+        font-family: var(--font-d);
+        font-size: 0.95rem;
+        color: var(--cyan);
+        line-height: 1;
+      }
+      .fc-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        margin: 4px auto 0;
+      }
+
+      /* ── 安全カード ── */
+      .safe-list {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .safe-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        padding: 9px 11px;
+        border-radius: var(--r-sm);
+        background: rgba(0, 0, 0, 0.2);
+      }
+      .safe-item.alert {
+        border-left: 3px solid var(--red);
+      }
+      .safe-item.warn {
+        border-left: 3px solid var(--amber);
+      }
+      .safe-item.info {
+        border-left: 3px solid var(--cyan);
+      }
+      .safe-item.ok {
+        border-left: 3px solid var(--green);
+      }
+      .safe-ico {
+        font-size: 0.95rem;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+      .safe-ttl {
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-bottom: 2px;
+      }
+      .safe-desc {
+        font-size: 0.66rem;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      /* ── 混雑カード ── */
+      .crowd-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+      }
+      .crowd-meter {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .crowd-lbl {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.7rem;
+        color: var(--muted);
+      }
+      .crowd-lv {
+        font-weight: 700;
+        font-size: 0.78rem;
+      }
+      .crowd-track {
+        height: 9px;
+        background: rgba(255, 255, 255, 0.07);
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .crowd-fill {
+        height: 100%;
+        border-radius: 5px;
+        transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .crowd-spots {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+      .cs-item {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: var(--r-sm);
+        padding: 7px;
+        text-align: center;
+      }
+      .cs-name {
+        font-size: 0.6rem;
+        color: var(--muted);
+        margin-bottom: 3px;
+      }
+      .cs-lv {
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      /* ── 解析カード ── */
+      .analysis {
+        font-size: 0.76rem;
+        line-height: 1.82;
+        color: var(--text);
+      }
+      .analysis .hl {
+        color: var(--cyan);
+        font-weight: 700;
+      }
+
+      /* ── フッター ── */
+      .footer {
+        margin-top: 38px;
+        padding: 14px 0;
+        border-top: 1px solid var(--card-b);
+        text-align: center;
+        font-size: 0.63rem;
+        color: var(--muted);
+        letter-spacing: 0.07em;
+        line-height: 1.9;
+      }
+      .footer a {
+        color: var(--cyan);
+        text-decoration: none;
+      }
+      .ad-area {
+        margin-top: 16px;
+        display: flex;
+        justify-content: center;
+      }
+      .ad-area a {
+        display: block;
+        width: min(100%, 640px);
+      }
+      .ad-area img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: var(--r-sm);
+        border: 1px solid var(--card-b);
+      }
+      .promo-card {
+        margin-top: 12px;
+        padding: 14px 16px;
+        background: var(--card-bg);
+        border: 1px solid var(--card-b);
+        border-radius: var(--r-sm);
+        text-align: center;
+        line-height: 1.75;
+        font-size: 0.82rem;
+      }
+      .promo-card a {
+        color: var(--cyan);
+        font-weight: 700;
+        text-decoration: none;
+        word-break: break-all;
+      }
+      .promo-btn {
+        margin-top: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 18px;
+        border-radius: 20px;
+        border: 1px solid rgba(0, 229, 255, 0.35);
+        background: rgba(0, 229, 255, 0.12);
+        color: var(--cyan);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        transition: var(--tr);
+      }
+      .promo-btn:hover {
+        background: rgba(0, 229, 255, 0.2);
+        box-shadow: var(--glow);
+      }
+
+      /* ── スクロールバー ── */
+      ::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(0, 229, 255, 0.2);
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ローダー -->
+    <div class="loader" id="loader">
+      <div class="loader-bars">
+        <div class="lb"></div>
+        <div class="lb"></div>
+        <div class="lb"></div>
+        <div class="lb"></div>
+        <div class="lb"></div>
+      </div>
+      <div class="loader-txt">LOADING SURF DATA…</div>
+    </div>
+
+    <!-- 背景 -->
+    <div class="bg"></div>
+
+    <!-- アプリ本体 -->
+    <div id="wrap">
+      <!-- ヘッダー -->
+      <header class="hdr">
+        <div class="hdr-logo">
+          <span class="hdr-en">KUJUKURI SURF</span>
+          <span class="hdr-jp">九十九里 波情報</span>
+        </div>
+        <div class="hdr-right">
+          <div class="upd-time">
+            最終更新: <span id="updTime">取得中…</span>
+          </div>
+          <button class="refbtn" id="refBtn">
+            <span class="spin">↻</span> 更新
+          </button>
+        </div>
+      </header>
+
+      <!-- 波シミュレーション -->
+      <section class="wave-sec">
+        <div class="cv-top">
+          <div class="cv-spot" id="cvSpot">片貝サーフビーチ</div>
+          <span class="live-badge"><span class="live-dot"></span>LIVE SIM</span>
+        </div>
+        <canvas id="waveCanvas"></canvas>
+        <div class="cv-chips">
+          <div class="chip"><strong id="cpH">–</strong> 波高</div>
+          <div class="chip"><strong id="cpP">–</strong> 周期</div>
+          <div class="chip"><strong id="cpW">–</strong> 風速</div>
+        </div>
+      </section>
+
+      <!-- スポットタブ -->
+      <nav class="tabs" id="tabs"></nav>
+
+      <!-- グリッド -->
+      <main class="grid" id="grid"></main>
+
+      <div class="ad-area">
+        <a
+          href="https://pc.moppy.jp/entry/invite.php?invite=SCche115"
+          target="_blank"
+          rel="noopener"
+        >
+          <img
+            decoding="async"
+            loading="lazy"
+            src="https://img.moppy.jp/pub/pc/friend/640x480-3.jpg"
+            alt="1日10分からできる！節約・副業でお小遣い稼ぎ！ポイ活ならモッピー"
+            width="640"
+            height="480"
+          />
+        </a>
+      </div>
+      <div class="promo-card">
+        メルカリを使ってみてね！<br />
+        500円分お得にお買い物できる招待コード【KBJQGZ】<br />
+        アプリをインストールして招待コードを入力！👇<br />
+        <a
+          class="promo-btn"
+          href="https://link.jp.mercari.com/70tO/lpthbfqe"
+          target="_blank"
+          rel="noopener"
+          >ダウンロード</a
+        >
+      </div>
+
+      <!-- フッター -->
+      <footer class="footer">
+        データ提供:
+        <a href="https://open-meteo.com/" target="_blank" rel="noopener"
+          >Open-Meteo</a
+        >
+        （Marine API &amp; Weather API — 完全無料・登録不要）<br />
+        潮汐データは推計値です。正確な潮汐は
+        <a
+          href="https://www.data.jma.go.jp/kaiyou/db/tide/suisan/index.php"
+          target="_blank"
+          rel="noopener"
+          >気象庁潮位観測</a
+        >
+        をご参照ください。<br />
+        © <span id="yr"></span> Kujukuri Surf Report —
+        情報の利用は自己責任でお願いします。
+      </footer>
+    </div>
+
+    <script>
+      /* ============================================================
+   九十九里 波情報 — ALL-IN-ONE スクリプト
+   ============================================================ */
+
+      /* ── スポット定義 ── */
+      const SPOTS = [
+        {
+          id: "katakai_shin",
+          name: "新堤",
+          lat: 35.535,
+          lon: 140.468,
+          lv: "中〜上級",
+        },
+        { id: "gyoko", name: "漁港", lat: 35.545, lon: 140.46, lv: "初〜中級" },
+        { id: "sakuta", name: "作田", lat: 35.52, lon: 140.49, lv: "初〜中級" },
+        { id: "fudodo", name: "不動堂", lat: 35.5, lon: 140.5, lv: "全レベル" },
+        {
+          id: "toyomi",
+          name: "豊海海岸",
+          lat: 35.49,
+          lon: 140.51,
+          lv: "初〜中級",
+        },
+        {
+          id: "ichinomiya",
+          name: "一宮",
+          lat: 35.371,
+          lon: 140.39,
+          lv: "全レベル",
+        },
+        {
+          id: "shirako",
+          name: "白子",
+          lat: 35.45,
+          lon: 140.52,
+          lv: "初級向き",
+        },
+        {
+          id: "ichimatsu",
+          name: "一松",
+          lat: 35.41,
+          lon: 140.54,
+          lv: "初〜中級",
+        },
+        { id: "nakazato", name: "中里", lat: 35.43, lon: 140.53, lv: "中級" },
+        {
+          id: "hasunuma",
+          name: "蓮沼",
+          lat: 35.56,
+          lon: 140.45,
+          lv: "中〜上級",
+        },
+      ];
+
+      /* ── 状態 ── */
+      const S = {
+        spot: SPOTS[0],
+        data: null,
+        sim: null,
+        AUTO_MS: 30 * 60 * 1000,
+      };
+
+      /* ── 初期化 ── */
+      window.addEventListener("DOMContentLoaded", async () => {
+        document.getElementById("yr").textContent = new Date().getFullYear();
+        buildTabs();
+        initSim();
+        await loadData();
+        setInterval(() => loadData(), S.AUTO_MS);
+        document
+          .getElementById("refBtn")
+          .addEventListener("click", () => loadData(true));
+        setTimeout(() => {
+          const l = document.getElementById("loader");
+          l.classList.add("out");
+          setTimeout(() => l.remove(), 700);
+        }, 600);
+      });
+
+      /* ─────────────────────────────────────────
+   データ取得 (Open-Meteo)
+───────────────────────────────────────── */
+      async function loadData(manual = false) {
+        setBusy(true);
+        try {
+          const d = await fetchSurf(S.spot);
+          S.data = d;
+          renderAll(d);
+          setUpdTime(d.fetchedAt);
+        } catch (e) {
+          console.error(e);
+          if (manual)
+            showToast(
+              "データ取得に失敗しました。ネット接続を確認してください。",
+            );
+          const fb = mockData();
+          S.data = fb;
+          renderAll(fb);
+          setUpdTime(fb.fetchedAt, true);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function fetchSurf(spot) {
+        const [marine, weather] = await Promise.all([
+          fetch(
+            `https://marine-api.open-meteo.com/v1/marine?latitude=${spot.lat}&longitude=${spot.lon}` +
+              `&hourly=wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,wind_wave_height` +
+              `&forecast_days=3&timezone=Asia%2FTokyo`,
+          ).then((r) => r.json()),
+          fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${spot.lat}&longitude=${spot.lon}` +
+              `&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,temperature_2m` +
+              `&forecast_days=3&timezone=Asia%2FTokyo`,
+          ).then((r) => r.json()),
+        ]);
+        return buildReport(marine, weather, spot);
+      }
+
+      function buildReport(marine, weather, spot) {
+        const now = new Date();
+        const hi = getHourIdx(marine.hourly.time, now);
+        const g = (arr, i) => arr?.[i] ?? null;
+        const r2 = (v) => (v == null ? null : Math.round(v * 100) / 100);
+
+        const wH = g(marine.hourly.wave_height, hi);
+        const wP = g(marine.hourly.wave_period, hi);
+        const wD = g(marine.hourly.wave_direction, hi);
+        const sH = g(marine.hourly.swell_wave_height, hi);
+        const sP = g(marine.hourly.swell_wave_period, hi);
+        const sD = g(marine.hourly.swell_wave_direction, hi);
+        const wwH = g(marine.hourly.wind_wave_height, hi);
+        const spd = g(weather.hourly.wind_speed_10m, hi);
+        const dir = g(weather.hourly.wind_direction_10m, hi);
+        const gst = g(weather.hourly.wind_gusts_10m, hi);
+        const wc = g(weather.hourly.weather_code, hi);
+        const tmp = g(weather.hourly.temperature_2m, hi);
+
+        const wt = classifyWind(dir);
+        const q = calcQuality(wH, sP, spd, wt.type);
+        const sz = h2jp(wH);
+        const fc = buildForecast(marine, weather, hi);
+        const td = estimateTides(now);
+        const sf = buildSafety(wH, spd, wt.type, wc);
+        const cr = estimateCrowd(now, q.score);
+
+        return {
+          spot,
+          fetchedAt: now.toISOString(),
+          current: {
+            waveHeight: r2(wH),
+            wavePeriod: r2(wP),
+            waveDir: wD,
+            swellHeight: r2(sH),
+            swellPeriod: r2(sP),
+            swellDir: sD,
+            windWaveH: r2(wwH),
+            windSpeed: r2(spd),
+            windDir: dir,
+            windGusts: r2(gst),
+            temperature: r2(tmp),
+            weatherCode: wc,
+            sizeJP: sz,
+            windTypeInfo: wt,
+            qualityInfo: q,
+          },
+          tides: td,
+          forecast: fc,
+          safety: sf,
+          crowd: cr,
+        };
+      }
+
+      /* ─────────────────────────────────────────
+   データ変換ヘルパー
+───────────────────────────────────────── */
+      function getHourIdx(times, now) {
+        const key = now.toISOString().slice(0, 13);
+        const i = times.findIndex((t) => t.startsWith(key));
+        return i >= 0 ? i : 0;
+      }
+
+      function h2jp(h) {
+        if (h == null) return { label: "不明", en: "–", m: null };
+        if (h < 0.3) return { label: "ひざ以下", en: "Knee-", m: h };
+        if (h < 0.5) return { label: "ひざ", en: "Knee", m: h };
+        if (h < 0.8) return { label: "もも〜腰", en: "Thigh-Waist", m: h };
+        if (h < 1.0) return { label: "腰", en: "Waist", m: h };
+        if (h < 1.3) return { label: "腰〜腹", en: "Waist-Stmch", m: h };
+        if (h < 1.6) return { label: "腹〜胸", en: "Stmch-Chest", m: h };
+        if (h < 2.0) return { label: "胸", en: "Chest", m: h };
+        if (h < 2.5) return { label: "胸〜肩", en: "Chest-Shldr", m: h };
+        if (h < 3.0) return { label: "頭", en: "Head", m: h };
+        if (h < 4.0) return { label: "頭〜OH", en: "Head-OH", m: h };
+        return { label: "OH以上", en: "DOH+", m: h };
+      }
+
+      // 九十九里は東向き海岸：西〜北西がオフショア
+      function classifyWind(d) {
+        if (d == null)
+          return { type: "unknown", label: "不明", icon: "🌬️", dirDeg: 0 };
+        const deg = ((d % 360) + 360) % 360;
+        if (deg >= 210 && deg <= 310)
+          return {
+            type: "offshore",
+            label: "オフショア",
+            icon: "💚",
+            dirDeg: deg,
+          };
+        if (deg >= 30 && deg <= 150)
+          return {
+            type: "onshore",
+            label: "オンショア",
+            icon: "🔴",
+            dirDeg: deg,
+          };
+        if (deg > 310 || deg < 30)
+          return {
+            type: "side-off",
+            label: "サイドオフ",
+            icon: "🟡",
+            dirDeg: deg,
+          };
+        return {
+          type: "sideshore",
+          label: "サイドショア",
+          icon: "🟠",
+          dirDeg: deg,
+        };
+      }
+
+      function calcQuality(wH, sP, spd, wt) {
+        let sc = 5;
+        if (wt === "offshore") sc += 2;
+        if (wt === "side-off") sc += 1;
+        if (wt === "onshore") sc -= 2;
+        if (wt === "sideshore") sc -= 1;
+        if (spd != null) {
+          if (spd < 5) sc++;
+          if (spd > 15) sc--;
+          if (spd > 25) sc--;
+        }
+        if (sP != null) {
+          if (sP >= 10) sc += 2;
+          else if (sP >= 7) sc++;
+          else if (sP < 5) sc--;
+        }
+        if (wH != null) {
+          if (wH >= 0.8 && wH <= 1.8) sc++;
+          if (wH < 0.3 || wH > 3) sc -= 2;
+        }
+        sc = Math.min(10, Math.max(0, sc));
+        const tier = sc >= 8 ? "good" : sc >= 5 ? "fair" : "poor";
+        const label = sc >= 8 ? "GOOD" : sc >= 5 ? "FAIR" : "POOR";
+        return { score: sc, label, tier };
+      }
+
+      function waveFaceGrade(score) {
+        if (score >= 8) return { grade: "◎", label: "良い" };
+        if (score >= 6) return { grade: "〇", label: "まあまあ" };
+        if (score >= 4) return { grade: "△", label: "普通" };
+        return { grade: "×", label: "悪い" };
+      }
+
+      function buildForecast(marine, weather, startIdx) {
+        const out = [],
+          step = 3;
+        const times = marine.hourly.time;
+        for (let i = 0; i < 8; i++) {
+          const idx = startIdx + i * step;
+          if (idx >= times.length) break;
+          const wH = marine.hourly.wave_height?.[idx];
+          const sP = marine.hourly.swell_wave_period?.[idx];
+          const spd = weather.hourly.wind_speed_10m?.[idx];
+          const wD = weather.hourly.wind_direction_10m?.[idx];
+          const wc = weather.hourly.weather_code?.[idx];
+          const wt = classifyWind(wD);
+          const q = calcQuality(wH, sP, spd, wt.type);
+          out.push({
+            timeLabel: times[idx]?.slice(11, 16) ?? "–",
+            waveHeight: wH != null ? Math.round(wH * 100) / 100 : null,
+            sizeJP: h2jp(wH),
+            windType: wt.type,
+            quality: q,
+            wIcon: wCode2Icon(wc),
+          });
+        }
+        return out;
+      }
+
+      function estimateTides(now) {
+        const LUNAR = 12.42;
+        const ref = new Date("2024-01-01T00:00:00+09:00");
+        const hEl = (now - ref) / 3600000;
+        const phase = (hEl % LUNAR) / LUNAR;
+        const evts = [];
+        for (let i = 0; i < 6; i++) {
+          const off = i * (LUNAR / 2);
+          const et = new Date(now.getTime() + off * 3600000);
+          const p = ((hEl + off) % LUNAR) / LUNAR;
+          const isH = Math.sin(p * Math.PI * 2) > 0;
+          const hh = et.getHours().toString().padStart(2, "0");
+          const mm = et.getMinutes().toString().padStart(2, "0");
+          evts.push({
+            type: isH ? "high" : "low",
+            typeLabel: isH ? "満潮" : "干潮",
+            timeLabel: `${hh}:${mm}`,
+            heightM: isH ? 1.5 + Math.sin(p * Math.PI * 2) * 0.3 : 0.3,
+          });
+        }
+        return {
+          events: evts,
+          currentLevel: (Math.sin(phase * Math.PI * 2) + 1) / 2,
+        };
+      }
+
+      function buildSafety(wH, spd, wt, wc) {
+        const items = [];
+        if (wH > 2.5)
+          items.push({
+            level: "alert",
+            icon: "⚠️",
+            title: "大波警戒",
+            desc: "波高2.5m超。上級者のみ推奨。離岸流に注意。",
+          });
+        else if (wH > 1.5)
+          items.push({
+            level: "warn",
+            icon: "🌊",
+            title: "波高注意",
+            desc: "波高1.5m超。初心者は注意が必要です。",
+          });
+        else
+          items.push({
+            level: "ok",
+            icon: "✅",
+            title: "波高良好",
+            desc: `波高 ${wH?.toFixed(1) ?? "–"}m。一般サーファーに適したコンディションです。`,
+          });
+        if (spd > 15)
+          items.push({
+            level: "warn",
+            icon: "💨",
+            title: "強風注意",
+            desc: `風速 ${spd?.toFixed(1) ?? "–"} m/s。波面が荒れやすいです。`,
+          });
+        if (wc >= 95)
+          items.push({
+            level: "alert",
+            icon: "⛈️",
+            title: "雷雨警戒",
+            desc: "雷雨の可能性。入水は控えてください。",
+          });
+        else if (wc >= 61)
+          items.push({
+            level: "warn",
+            icon: "🌧️",
+            title: "雨天",
+            desc: "降雨中。視界不良に注意。",
+          });
+        if (wH > 1.0)
+          items.push({
+            level: "info",
+            icon: "🔵",
+            title: "離岸流",
+            desc: "九十九里中央部はカレントが発生しやすいです。",
+          });
+        items.push({
+          level: "info",
+          icon: "ℹ️",
+          title: "ライフセーバー",
+          desc: "夏季はビーチパトロール実施。監視エリア内で入水を。",
+        });
+        return items;
+      }
+
+      function estimateCrowd(now, qScore) {
+        const h = now.getHours(),
+          d = now.getDay();
+        let sc = 3;
+        if (d === 0 || d === 6) sc += 3;
+        if (h >= 9 && h <= 12) sc += 2;
+        if (h >= 13 && h <= 16) sc += 1;
+        if (h < 6 || h > 19) sc -= 3;
+        if (qScore >= 8) sc += 2;
+        if (qScore <= 3) sc -= 2;
+        sc = Math.min(10, Math.max(0, sc));
+        const level = sc <= 3 ? "low" : sc <= 6 ? "mid" : "high";
+        const label = sc <= 3 ? "空いている" : sc <= 6 ? "混雑" : "激混み";
+        const color = sc <= 3 ? "#00e676" : sc <= 6 ? "#ffb300" : "#ff5252";
+        return {
+          score: sc,
+          pct: sc * 10,
+          level,
+          label,
+          color,
+          spots: SPOTS.slice(0, 3).map((s, i) => {
+            const sv = Math.min(10, Math.max(0, sc + (i === 1 ? 1 : -1)));
+            return {
+              name: s.name.replace(/サーフ.*|ビーチ.*|ポイント.*/, "").trim(),
+              score: sv,
+              label: sv <= 3 ? "空" : sv <= 6 ? "普通" : "混",
+              color: sv <= 3 ? "#00e676" : sv <= 6 ? "#ffb300" : "#ff5252",
+            };
+          }),
+        };
+      }
+
+      function wCode2Icon(c) {
+        if (c == null) return "☀️";
+        if (c === 0) return "☀️";
+        if (c <= 2) return "🌤️";
+        if (c <= 3) return "☁️";
+        if (c <= 49) return "🌫️";
+        if (c <= 67) return "🌧️";
+        if (c <= 77) return "🌨️";
+        if (c <= 82) return "🌦️";
+        if (c <= 99) return "⛈️";
+        return "🌈";
+      }
+
+      function deg2dir(d) {
+        if (d == null) return "–";
+        const dirs = [
+          "北",
+          "北北東",
+          "北東",
+          "東北東",
+          "東",
+          "東南東",
+          "南東",
+          "南南東",
+          "南",
+          "南南西",
+          "南西",
+          "西南西",
+          "西",
+          "北西",
+          "北北西",
+        ];
+        return dirs[Math.round((((d % 360) + 360) % 360) / 22.5) % 16];
+      }
+
+      /* ─────────────────────────────────────────
+   UI レンダリング
+───────────────────────────────────────── */
+      function renderAll(data) {
+        const { current: c, tides, forecast, safety, crowd } = data;
+
+        // Canvasパラメータ
+        S.sim?.update({
+          waveHeight: c.waveHeight ?? 1.0,
+          swellPeriod: c.swellPeriod ?? 8,
+          windSpeed: c.windSpeed ?? 5,
+          windType: c.windTypeInfo?.type ?? "offshore",
+        });
+        document.getElementById("cpH").textContent =
+          c.waveHeight != null ? `${c.waveHeight.toFixed(1)}m` : "–";
+        document.getElementById("cpP").textContent =
+          c.wavePeriod != null ? `${c.wavePeriod.toFixed(0)}s` : "–";
+        document.getElementById("cpW").textContent =
+          c.windSpeed != null ? `${c.windSpeed.toFixed(0)}m/s` : "–";
+        document.getElementById("cvSpot").textContent = data.spot.name;
+
+        // グリッド
+        const grid = document.getElementById("grid");
+        grid.innerHTML = "";
+        [
+          cardCond(c),
+          cardWind(c),
+          cardSwell(c),
+          cardTide(tides),
+          cardForecast(forecast),
+          cardSafety(safety),
+          cardCrowd(crowd),
+          cardAnalysis(data),
+        ].forEach((el, i) => {
+          el.style.animationDelay = `${i * 0.07}s`;
+          grid.appendChild(el);
+        });
+
+        // 潮汐グラフ（DOM後）
+        requestAnimationFrame(() => {
+          const tc = document.getElementById("tideCanvas");
+          if (tc) drawTide(tc, tides);
+        });
+      }
+
+      function mk(cls = "card") {
+        const d = document.createElement("div");
+        d.className = cls;
+        return d;
+      }
+
+      /* ── コンディション ── */
+      function cardCond(c) {
+        const q = c.qualityInfo ?? { score: 5, label: "FAIR", tier: "fair" };
+        const sz = c.sizeJP ?? { label: "–", en: "–", m: null };
+        const wf = waveFaceGrade(q.score ?? 5);
+        const shape =
+          c.swellPeriod >= 10 && c.windTypeInfo?.type === "offshore"
+            ? "ホレている"
+            : c.swellPeriod >= 8
+              ? "形が良い"
+              : c.windTypeInfo?.type === "onshore"
+                ? "厚い（ダンパー）"
+                : "普通";
+        const brkStr =
+          c.swellPeriod >= 10 && (c.windSpeed ?? 99) < 8
+            ? "チューブ気味"
+            : c.swellPeriod >= 8
+              ? "スピーディ"
+              : (c.windSpeed ?? 0) > 15
+                ? "クローズドアウト"
+                : "ファン系";
+        const el = mk();
+        el.innerHTML = `
+    <div class="c-hdr"><span class="c-ico">🌊</span><span class="c-ttl">波のコンディション</span></div>
+    <div class="cond-main">
+      <div class="wave-size">
+        <div class="lbl">現在の波サイズ</div>
+        <div class="val">${sz.label}</div>
+        <div class="sub">${sz.en}${sz.m != null ? ` (${sz.m.toFixed(1)}m)` : ""}</div>
+      </div>
+      <div class="quality ${q.tier}">
+        <div class="q-score">${q.score}<span style="font-size:.38em">/10</span></div>
+        <div class="q-tag">${q.label}</div>
+      </div>
+    </div>
+    <div class="cond-grid">
+      <div class="ci"><div class="l">波の形</div><div class="v">${shape}</div></div>
+      <div class="ci"><div class="l">割れ方</div><div class="v">${brkStr}</div></div>
+      <div class="ci"><div class="l">波のフェイス評価</div><div class="v">${wf.grade} ${wf.label}</div></div>
+      <div class="ci"><div class="l">周期</div><div class="v">${c.wavePeriod != null ? `${c.wavePeriod.toFixed(1)}秒` : "–"}</div></div>
+      <div class="ci"><div class="l">気温</div><div class="v">${c.temperature != null ? `${c.temperature.toFixed(1)}°C` : "–"}</div></div>
+      <div class="ci"><div class="l">評価基準</div><div class="v">◎ 良い / 〇 まあまあ / △ 普通 / × 悪い</div></div>
+    </div>`;
+        return el;
+      }
+
+      /* ── 風 ── */
+      function cardWind(c) {
+        const wt = c.windTypeInfo ?? {
+          type: "unknown",
+          label: "–",
+          icon: "🌬️",
+          dirDeg: 0,
+        };
+        const el = mk();
+        el.innerHTML = `
+    <div class="c-hdr"><span class="c-ico">💨</span><span class="c-ttl">風</span></div>
+    <div class="wind-row">
+      <div class="compass">
+        <div class="c-ring">
+          <div class="c-arrow" style="transform:rotate(${c.windDir ?? 0}deg)"></div>
+        </div>
+      </div>
+      <div class="wind-info">
+        <div><span class="spd">${c.windSpeed != null ? c.windSpeed.toFixed(1) : "–"}</span><span class="unit">m/s</span></div>
+        <div class="dir">${deg2dir(c.windDir)} (${c.windDir != null ? Math.round(c.windDir) : "–"}°)</div>
+        <span class="wtype ${wt.type}">${wt.icon} ${wt.label}</span>
+        ${c.windGusts != null ? `<div class="gust">突風: ${c.windGusts.toFixed(1)} m/s</div>` : ""}
+      </div>
+    </div>`;
+        return el;
+      }
+
+      /* ── うねり ── */
+      function cardSwell(c) {
+        const sH = c.swellHeight ?? 0;
+        const wH = c.windWaveH ?? 0;
+        const sP = c.swellPeriod ?? 0;
+        const mx = Math.max(sH, wH, 1);
+        const el = mk();
+        el.innerHTML = `
+    <div class="c-hdr"><span class="c-ico">〰️</span><span class="c-ttl">うねり・波浪</span></div>
+    <div class="swell-list">
+      <div class="sw-item">
+        <div class="sw-meta"><span class="sw-name">うねり波高</span><span class="sw-val">${sH.toFixed(2)}m</span></div>
+        <div class="bar-track"><div class="bar-fill fill-a" style="width:${Math.min(100, (sH / mx) * 100).toFixed(0)}%"></div></div>
+      </div>
+      <div class="sw-item">
+        <div class="sw-meta"><span class="sw-name">風浪高</span><span class="sw-val">${wH.toFixed(2)}m</span></div>
+        <div class="bar-track"><div class="bar-fill fill-b" style="width:${Math.min(100, (wH / mx) * 100).toFixed(0)}%"></div></div>
+      </div>
+      <div class="sw-item">
+        <div class="sw-meta"><span class="sw-name">うねり周期</span><span class="sw-val">${sP.toFixed(1)}s</span></div>
+        <div class="bar-track"><div class="bar-fill fill-c" style="width:${Math.min(100, (sP / 20) * 100).toFixed(0)}%"></div></div>
+      </div>
+    </div>
+    <div class="swell-dirs">
+      <div class="ci" style="flex:1"><div class="l">うねり向き</div><div class="v">${deg2dir(c.swellDir)}</div></div>
+      <div class="ci" style="flex:1"><div class="l">波の向き</div><div class="v">${deg2dir(c.waveDir)}</div></div>
+    </div>`;
+        return el;
+      }
+
+      /* ── 潮汐 ── */
+      function cardTide(tides) {
+        const el = mk("card span2");
+        const evHTML = (tides.events ?? [])
+          .slice(0, 4)
+          .map(
+            (e) => `
+    <div class="te">
+      <div class="te-type">${e.typeLabel}</div>
+      <div class="te-time">${e.timeLabel}</div>
+      <div class="te-h">${e.heightM != null ? e.heightM.toFixed(2) + "m" : "–"}</div>
+    </div>`,
+          )
+          .join("");
+        el.innerHTML = `
+    <div class="c-hdr"><span class="c-ico">🌊</span><span class="c-ttl">潮汐（推計値）</span></div>
+    <canvas id="tideCanvas"></canvas>
+    <div class="tide-events">${evHTML}</div>`;
+        return el;
+      }
+
+      /* ── 予報 ── */
+      function cardForecast(fc) {
+        const el = mk("card span2");
+        const items = (fc ?? [])
+          .map((f, i) => {
+            const dc =
+              f.quality.tier === "good"
+                ? "#00e676"
+                : f.quality.tier === "fair"
+                  ? "#ffb300"
+                  : "#ff5252";
+            return `<div class="fc-item ${i === 0 ? "on" : ""}">
+      <div class="fc-time">${f.timeLabel}</div>
+      <span class="fc-ico">${f.wIcon}</span>
+      <div class="fc-wave">${f.sizeJP?.label ?? "–"}</div>
+      <div class="fc-dot" style="background:${dc}"></div>
+    </div>`;
+          })
+          .join("");
+        el.innerHTML = `
+    <div class="c-hdr"><span class="c-ico">📅</span><span class="c-ttl">24時間予報（3h刻み）</span></div>
+    <div class="fc-grid">${items}</div>`;
+        return el;
+      }
+
+      /* ── 安全 ── */
+      function cardSafety(sf) {
+        const el = mk();
+        const items = (sf ?? [])
+          .map(
+            (s) => `
+    <div class="safe-item ${s.level}">
+      <span class="safe-ico">${s.icon}</span>
+      <div><div class="safe-ttl">${s.title}</div><div class="safe-desc">${s.desc}</div></div>
+    </div>`,
+          )
+          .join("");
+        el.innerHTML = `
+    <div class="c-hdr"><span class="c-ico">⛑️</span><span class="c-ttl">安全・注意情報</span></div>
+    <div class="safe-list">${items}</div>`;
+        return el;
+      }
+
+      /* ── 混雑 ── */
+      function cardCrowd(cr) {
+        const el = mk();
+        const spotsH = (cr.spots ?? [])
+          .map(
+            (s) => `
+    <div class="cs-item">
+      <div class="cs-name">${s.name}</div>
+      <div class="cs-lv" style="color:${s.color}">${s.label}</div>
+    </div>`,
+          )
+          .join("");
+        const bg =
+          cr.level === "low"
+            ? "linear-gradient(90deg,#00e676,#69f0ae)"
+            : cr.level === "high"
+              ? "linear-gradient(90deg,#ff5252,#ff6e6e)"
+              : "linear-gradient(90deg,#ffb300,#ffd740)";
+        el.innerHTML = `
+    <div class="c-hdr"><span class="c-ico">🏄</span><span class="c-ttl">混雑度</span></div>
+    <div class="crowd-wrap">
+      <div class="crowd-meter">
+        <div class="crowd-lbl"><span>混雑度</span><span class="crowd-lv" style="color:${cr.color}">${cr.label}</span></div>
+        <div class="crowd-track"><div class="crowd-fill" style="width:${cr.pct ?? 50}%;background:${bg}"></div></div>
+      </div>
+      <div class="crowd-spots">${spotsH}</div>
+    </div>`;
+        return el;
+      }
+
+      /* ── 解析テキスト ── */
+      function cardAnalysis(data) {
+        const { current: c, forecast } = data;
+        const q = c.qualityInfo ?? {};
+        const w = c.windTypeInfo ?? {};
+        const s = c.sizeJP ?? {};
+
+        const ov =
+          q.tier === "good"
+            ? `<span class="hl">本日は絶好のサーフィン日和です！</span>`
+            : q.tier === "fair"
+              ? `本日は<span class="hl">そこそこのコンディション</span>です。`
+              : `本日は<span class="hl">コンディションが悪め</span>です。初心者は控えることをおすすめします。`;
+
+        const wc =
+          w.type === "offshore"
+            ? `風は<span class="hl">オフショア（${Math.round(c.windSpeed ?? 0)}m/s）</span>で波面が整っています。`
+            : w.type === "onshore"
+              ? `風が<span class="hl">オンショア（${Math.round(c.windSpeed ?? 0)}m/s）</span>のため波面が荒れています。`
+              : `風は${w.label}（${Math.round(c.windSpeed ?? 0)}m/s）です。`;
+
+        const sp =
+          (c.swellPeriod ?? 0) >= 10
+            ? `うねり周期<span class="hl">${(c.swellPeriod ?? 0).toFixed(0)}秒</span>でパワーのある波が期待できます。`
+            : `うねり周期${(c.swellPeriod ?? 0).toFixed(0)}秒です。`;
+
+        const szc = `現在の波は<span class="hl">${s.label}</span>${s.m != null ? `（${s.m.toFixed(1)}m）` : ""}。`;
+
+        const fc3 = (forecast ?? []).slice(1, 4);
+        let fct = "";
+        if (fc3.length > 0) {
+          const avg =
+            fc3.reduce((a, f) => a + (f.waveHeight ?? 0), 0) / fc3.length;
+          fct =
+            avg > (c.waveHeight ?? 0) * 1.1
+              ? `今後3〜9時間で<span class="hl">サイズアップ</span>の見込みです。`
+              : avg < (c.waveHeight ?? 0) * 0.9
+                ? `今後3〜9時間で<span class="hl">サイズダウン</span>が予想されます。`
+                : `今後しばらくは<span class="hl">現在のコンディションが継続</span>の見込みです。`;
+        }
+
+        const el = mk("card span2");
+        el.innerHTML = `
+    <div class="c-hdr"><span class="c-ico">🔍</span><span class="c-ttl">コンディション解析 &amp; 今後の見通し</span></div>
+    <div class="analysis">${[ov, szc, wc, sp, fct].filter(Boolean).join("<br>")}</div>`;
+        return el;
+      }
+
+      /* ─────────────────────────────────────────
+   波シミュレーション (Canvas)
+───────────────────────────────────────── */
+      // 簡易Perlinノイズ
+      function makeNoise() {
+        const p = new Uint8Array(256);
+        for (let i = 0; i < 256; i++) p[i] = i;
+        for (let i = 255; i > 0; i--) {
+          const j = (Math.random() * (i + 1)) | 0;
+          [p[i], p[j]] = [p[j], p[i]];
+        }
+        const pm = new Uint8Array(512);
+        for (let i = 0; i < 512; i++) pm[i] = p[i & 255];
+        function fade(t) {
+          return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+        function lerp(a, b, t) {
+          return a + t * (b - a);
+        }
+        function grad(h, x, y) {
+          const u = h < 4 ? x : y,
+            v = h < 4 ? y : x;
+          return (h & 1 ? -u : u) + (h & 2 ? -v : v);
+        }
+        return (x, y) => {
+          const X = Math.floor(x) & 255,
+            Y = Math.floor(y) & 255;
+          x -= Math.floor(x);
+          y -= Math.floor(y);
+          const u = fade(x),
+            v = fade(y);
+          const a = pm[X] + Y,
+            b = pm[X + 1] + Y;
+          return lerp(
+            lerp(grad(pm[a], x, y), grad(pm[b], x - 1, y), u),
+            lerp(grad(pm[a + 1], x, y - 1), grad(pm[b + 1], x - 1, y - 1), u),
+            v,
+          );
+        };
+      }
+
+      function initSim() {
+        const canvas = document.getElementById("waveCanvas");
+        const ctx = canvas.getContext("2d");
+        const noise = makeNoise();
+        let t = 0,
+          W = 0,
+          H = 0;
+        const params = {
+          waveHeight: 1.0,
+          swellPeriod: 8,
+          windSpeed: 5,
+          windType: "offshore",
+        };
+
+        const ro = new ResizeObserver(() => {
+          const dpr = devicePixelRatio || 1;
+          const r = canvas.getBoundingClientRect();
+          canvas.width = r.width * dpr;
+          canvas.height = r.height * dpr;
+          ctx.scale(dpr, dpr);
+          W = r.width;
+          H = r.height;
+        });
+        ro.observe(canvas);
+
+        S.sim = {
+          update(p) {
+            Object.assign(params, p);
+          },
+        };
+
+        function draw() {
+          if (!W || !H) {
+            requestAnimationFrame(draw);
+            return;
+          }
+          t += 0.007;
+          ctx.clearRect(0, 0, W, H);
+
+          // 空背景
+          const sg = ctx.createLinearGradient(0, 0, 0, H * 0.46);
+          sg.addColorStop(0, "#020d1a");
+          sg.addColorStop(0.65, "#051a30");
+          sg.addColorStop(1, "#0a2a4a");
+          ctx.fillStyle = sg;
+          ctx.fillRect(0, 0, W, H);
+
+          // 星
+          for (let i = 0; i < 38; i++) {
+            const sx = (i * 137.5 + 50) % W,
+              sy = (i * 79.4 + 20) % (H * 0.37);
+            const al = 0.25 + Math.sin(t * 0.5 + i) * 0.14;
+            ctx.beginPath();
+            ctx.arc(sx, sy, 0.5 + (i % 3) * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(180,220,255,${al})`;
+            ctx.fill();
+          }
+
+          // 水平線
+          const hy = H * 0.43;
+          const hg = ctx.createLinearGradient(0, hy - 18, 0, hy + 18);
+          hg.addColorStop(0, "transparent");
+          hg.addColorStop(0.5, "rgba(0,180,220,.07)");
+          hg.addColorStop(1, "transparent");
+          ctx.fillStyle = hg;
+          ctx.fillRect(0, hy - 18, W, 36);
+
+          // 月の光反射
+          const cx = W * 0.68;
+          for (let y = hy; y < H; y += 2) {
+            const prog = (y - hy) / (H - hy);
+            const xsp = (70 + Math.sin(t * 0.4) * 15) * prog;
+            const al = (1 - prog) * 0.2 * (0.7 + Math.sin(t + y * 0.05) * 0.3);
+            ctx.fillStyle = `rgba(0,180,255,${al})`;
+            ctx.fillRect(cx - xsp / 2, y, xsp, 2);
+          }
+
+          // 波レイヤー
+          const amp0 = Math.min((params.waveHeight ?? 1) * 18, 55);
+          const NL = 5;
+          for (let l = NL - 1; l >= 0; l--) {
+            const prog = l / (NL - 1);
+            const baseY = hy + (H - hy) * prog * 0.88;
+            const amp = amp0 * (0.25 + prog * 1.5);
+            const spd = 0.35 + prog * 0.85;
+            const nf = 0.005 + prog * 0.003;
+            const wf = (2 * Math.PI) / (140 + (1 - prog) * 210);
+
+            const blue = Math.round(55 + prog * 125);
+            const green = Math.round(95 + prog * 85);
+            const al = 0.32 + prog * 0.58;
+
+            ctx.beginPath();
+            ctx.moveTo(0, H);
+            for (let x = 0; x <= W; x += 2) {
+              const nv = noise(x * nf, t * 0.28 + l * 11);
+              const onWind =
+                params.windType === "onshore"
+                  ? Math.sin(x * wf * 2 + t * spd * 2) * amp * 0.28
+                  : 0;
+              const wy =
+                baseY +
+                Math.sin(x * wf + t * spd) * amp * 0.6 +
+                Math.sin(x * wf * 0.7 + t * spd * 1.3 + 1.2) * amp * 0.3 +
+                nv * amp * 0.85 +
+                onWind;
+              ctx.lineTo(x, wy);
+            }
+            ctx.lineTo(W, H);
+            ctx.closePath();
+            const wg = ctx.createLinearGradient(0, baseY - amp, 0, H);
+            wg.addColorStop(0, `rgba(0,${green},${blue},${al * 0.9})`);
+            wg.addColorStop(
+              0.3,
+              `rgba(0,${Math.floor(green * 0.78)},${Math.floor(blue * 1.22)},${al})`,
+            );
+            wg.addColorStop(1, `rgba(2,13,26,${al * 1.2})`);
+            ctx.fillStyle = wg;
+            ctx.fill();
+
+            // 波頭ライン
+            if (l === 0) {
+              ctx.save();
+              ctx.strokeStyle = `rgba(0,229,255,${0.28 + Math.sin(t * 2) * 0.1})`;
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              ctx.moveTo(0, H);
+              for (let x = 0; x <= W; x += 2) {
+                const nv = noise(x * nf, t * 0.28 + l * 11);
+                const wy =
+                  baseY +
+                  Math.sin(x * wf + t * spd) * amp * 0.6 +
+                  Math.sin(x * wf * 0.7 + t * spd * 1.3 + 1.2) * amp * 0.3 +
+                  nv * amp * 0.85;
+                ctx.lineTo(x, wy);
+              }
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
+
+          // 波しぶき
+          const fc = Math.floor(4 + (params.waveHeight ?? 1) * 3);
+          for (let i = 0; i < fc; i++) {
+            const prog = ((t * (0.28 + i * 0.065) + i * 1.7) % 1.3) - 0.15;
+            if (prog < 0 || prog > 1) continue;
+            const fx = (((i * 137.5 + t * 22) % W) + W) % W;
+            const fy = H * (0.54 + prog * 0.36);
+            const fr = 3 + prog * 11;
+            const fa = (1 - Math.abs(prog - 0.5) * 2) * 0.38;
+            ctx.save();
+            const fg = ctx.createRadialGradient(fx, fy, 0, fx, fy, fr);
+            fg.addColorStop(0, `rgba(255,255,255,${fa})`);
+            fg.addColorStop(0.6, `rgba(200,240,255,${fa * 0.45})`);
+            fg.addColorStop(1, "transparent");
+            ctx.fillStyle = fg;
+            ctx.beginPath();
+            ctx.ellipse(fx, fy, fr * 2, fr * 0.55, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          // 手前グラデーション
+          const dg = ctx.createLinearGradient(0, H * 0.68, 0, H);
+          dg.addColorStop(0, "transparent");
+          dg.addColorStop(1, "rgba(2,13,26,.48)");
+          ctx.fillStyle = dg;
+          ctx.fillRect(0, 0, W, H);
+
+          requestAnimationFrame(draw);
+        }
+        requestAnimationFrame(draw);
+      }
+
+      /* ─────────────────────────────────────────
+   潮汐チャート
+───────────────────────────────────────── */
+      function drawTide(canvas, tides) {
+        const dpr = devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+        const W = rect.width,
+          H = rect.height;
+        const PL = 10,
+          PR = 10,
+          PT = 6,
+          PB = 18;
+
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = "rgba(0,0,0,.15)";
+        ctx.beginPath();
+        ctx.roundRect(0, 0, W, H, 7);
+        ctx.fill();
+
+        // グリッド
+        ctx.strokeStyle = "rgba(255,255,255,.05)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+          const y = PT + (H - PT - PB) * (i / 4);
+          ctx.beginPath();
+          ctx.moveTo(PL, y);
+          ctx.lineTo(W - PR, y);
+          ctx.stroke();
+        }
+
+        const LUNAR = 12.42;
+        const now = new Date();
+        const pts = [];
+        for (let i = 0; i <= 120; i++) {
+          const h = (i / 120) * 24 - 12;
+          const hEl = now.getTime() / 3600000 + h;
+          const lv = (Math.sin((hEl / LUNAR) * Math.PI * 2) + 1) / 2;
+          pts.push({
+            x: PL + (i / 120) * (W - PL - PR),
+            y: PT + (1 - lv) * (H - PT - PB),
+          });
+        }
+
+        // 海面塗り
+        ctx.beginPath();
+        ctx.moveTo(PL, H - PB);
+        pts.forEach((p) => ctx.lineTo(p.x, p.y));
+        ctx.lineTo(W - PR, H - PB);
+        ctx.closePath();
+        const tg = ctx.createLinearGradient(0, PT, 0, H - PB);
+        tg.addColorStop(0, "rgba(0,150,200,.42)");
+        tg.addColorStop(0.6, "rgba(0,80,140,.22)");
+        tg.addColorStop(1, "rgba(0,0,0,.05)");
+        ctx.fillStyle = tg;
+        ctx.fill();
+
+        // カーブ
+        ctx.beginPath();
+        pts.forEach((p, i) =>
+          i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y),
+        );
+        ctx.strokeStyle = "rgba(0,229,255,.7)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 現在位置
+        const np = pts[60];
+        ctx.beginPath();
+        ctx.arc(np.x, np.y, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#00e5ff";
+        ctx.fill();
+        ctx.strokeStyle = "#020d1a";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 時間ラベル
+        ctx.fillStyle = "rgba(168,223,240,.5)";
+        ctx.font = `${Math.max(8, 9)}px sans-serif`;
+        ctx.textAlign = "center";
+        [-12, -6, 0, 6, 12].forEach((h) => {
+          const xp = PL + ((h + 12) / 24) * (W - PL - PR);
+          const tt = new Date(now.getTime() + h * 3600000);
+          ctx.fillText(
+            `${String(tt.getHours()).padStart(2, "0")}:00`,
+            xp,
+            H - 3,
+          );
+        });
+      }
+
+      /* ─────────────────────────────────────────
+   タブ生成
+───────────────────────────────────────── */
+      function buildTabs() {
+        const el = document.getElementById("tabs");
+        SPOTS.forEach((sp) => {
+          const btn = document.createElement("button");
+          btn.className = "tab" + (sp.id === S.spot.id ? " on" : "");
+          btn.textContent = sp.name;
+          btn.onclick = async () => {
+            if (sp.id === S.spot.id) return;
+            S.spot = sp;
+            document
+              .querySelectorAll(".tab")
+              .forEach((b) => b.classList.remove("on"));
+            btn.classList.add("on");
+            await loadData();
+          };
+          el.appendChild(btn);
+        });
+      }
+
+      /* ─────────────────────────────────────────
+   ユーティリティ
+───────────────────────────────────────── */
+      function setBusy(on) {
+        const btn = document.getElementById("refBtn");
+        btn.classList.toggle("loading", on);
+        btn.disabled = on;
+      }
+
+      function setUpdTime(iso, fallback = false) {
+        const d = new Date(iso);
+        const s = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        document.getElementById("updTime").textContent =
+          s + (fallback ? "（キャッシュ）" : "");
+      }
+
+      function showToast(msg) {
+        const el = document.createElement("div");
+        el.style.cssText =
+          "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(255,82,82,.9);color:#fff;padding:10px 18px;border-radius:8px;font-size:.78rem;z-index:9999;letter-spacing:.05em;";
+        el.textContent = msg;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 4000);
+      }
+
+      function mockData() {
+        const now = new Date();
+        return {
+          spot: S.spot,
+          fetchedAt: now.toISOString(),
+          current: {
+            waveHeight: 1.2,
+            wavePeriod: 9.0,
+            waveDir: 100,
+            swellHeight: 1.0,
+            swellPeriod: 10.5,
+            swellDir: 110,
+            windWaveH: 0.4,
+            windSpeed: 4.2,
+            windDir: 250,
+            windGusts: 8.0,
+            temperature: 22.5,
+            weatherCode: 1,
+            sizeJP: { label: "腰〜腹", en: "Waist-Stmch", m: 1.2 },
+            windTypeInfo: {
+              type: "offshore",
+              label: "オフショア",
+              icon: "💚",
+              dirDeg: 250,
+            },
+            qualityInfo: { score: 7, label: "GOOD", tier: "good" },
+          },
+          tides: {
+            events: Array.from({ length: 6 }, (_, i) => {
+              const t = new Date(now.getTime() + i * 6.21 * 3600000);
+              return {
+                type: i % 2 === 0 ? "high" : "low",
+                typeLabel: i % 2 === 0 ? "満潮" : "干潮",
+                timeLabel: `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`,
+                heightM: i % 2 === 0 ? 1.6 : 0.3,
+              };
+            }),
+            currentLevel: 0.65,
+          },
+          forecast: Array.from({ length: 8 }, (_, i) => {
+            const t = new Date(now.getTime() + i * 3 * 3600000);
+            const h = 1.2 + Math.sin(i * 0.8) * 0.4;
+            return {
+              timeLabel: `${String(t.getHours()).padStart(2, "0")}:00`,
+              waveHeight: h,
+              sizeJP: { label: h < 0.8 ? "ひざ" : h < 1.3 ? "腰〜腹" : "胸" },
+              windType: i < 4 ? "offshore" : "sideshore",
+              quality: {
+                score: 7 - i * 0.5,
+                label: i < 3 ? "GOOD" : "FAIR",
+                tier: i < 3 ? "good" : "fair",
+              },
+              wIcon: i < 5 ? "🌤️" : "☁️",
+            };
+          }),
+          safety: [
+            {
+              level: "ok",
+              icon: "✅",
+              title: "波高良好",
+              desc: "波高1.2m。一般サーファーに適したコンディションです。",
+            },
+            {
+              level: "info",
+              icon: "🔵",
+              title: "離岸流",
+              desc: "九十九里中央部はカレントが発生しやすいです。",
+            },
+            {
+              level: "info",
+              icon: "ℹ️",
+              title: "ライフセーバー",
+              desc: "夏季はビーチパトロール実施中。",
+            },
+          ],
+          crowd: {
+            score: 5,
+            pct: 50,
+            level: "mid",
+            label: "混雑",
+            color: "#ffb300",
+            spots: SPOTS.slice(0, 3).map((s) => ({
+              name: s.name.replace(/サーフ.*|ビーチ.*|ポイント.*/, "").trim(),
+              score: 5,
+              label: "普通",
+              color: "#ffb300",
+            })),
+          },
+        };
+      }
+    </script>
+  </body>
+</html>
